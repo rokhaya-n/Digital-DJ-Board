@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player Sketch</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+</head>
+<body>
+    <script>
+        //ARRAY VARS
+        let songs = []; // array to hold songs
+        let songButtons = []; //buttons for songs
+        let songTitles; // object to hold song titles
+        let allSongs = 15; // no. of songs
+
+        //REGION STUFF
+        let southam, africa, northam, asia, europe;
+        let nabut, sabut, afbut, asbut, eubut;
+
+        //ALBUM COVER STUFF
+        let bigone;
+        let soda, enanitos, abuelos, youssou, vivi, magicSys, tate, nerPic, vMonet, skyResto, maher, rapline, alicia, tayc, sally;
+
+        //VARS FOR SONG MANIPILATION
+        let delay, distortion;
+        let amtD, amtDis;
+        let distortionSl, delaySl, speedSl;
+        let pausebut;
+
+        //sound effects
+        let echoHorn, discStop, discScratch, doubleSnare;
+        let echoHornBut, discStopBut, discScratchBut, doubleSnareBut;
+
+        //saving song remix file variables
+        let recordRemix, saveRemix, recordSong, stopRecord;
+
+        //MUSIC VARS
+        let songsDuration = [];
+        let cTime = 0;
+        let whatsPlaying = 14;
+
+        //spinning records object
+        let spinRec;
+
+        let recording = false;
+
+        function preload() {
+            for (let i = 0; i < allSongs; i++) {
+                songs[i] = loadSound('sounds/' + i + ".mp3");
+            }
+            songTitles = loadStrings('songNames.txt');
+
+            // Preloading region images
+            southam = loadImage('images/southam.webp');
+            africa = loadImage('images/africa.webp');
+            northam = loadImage('images/northam.png');
+            asia = loadImage('images/asia.gif');
+            europe = loadImage('images/europe.png');
+            bigone = loadImage('images/bigone.webp');
+
+            // Spinning records
+            soda = loadImage('images/0soda.png');
+            enanitos = loadImage('images/1enanitos.png');
+            abuelos = loadImage('images/2abuelos.jpeg');
+            youssou = loadImage('images/3youssou.png');
+            vivi = loadImage('images/4viviane.png');
+            magicSys = loadImage('images/5magicsystem.png');
+            tate = loadImage('images/6tate.png');
+            nerPic = loadImage('images/7nereyda.png');
+            vMonet = loadImage('images/8jaguar.png');
+            skyResto = loadImage('images/9sky.png');
+            maher = loadImage('images/10mawlaya.png');
+            rapline = loadImage('images/11ddaeng.png');
+            alicia = loadImage('images/12alicia.png');
+            tayc = loadImage('images/13tayc.png');
+            sally = loadImage('images/14sally.png');
+
+            // Sound effects
+            echoHorn = loadSound('sounds/echoHorn.mp3');
+            discStop = loadSound('sounds/discStop.mp3');
+            discScratch = loadSound('sounds/discScratch.mp3');
+            doubleSnare = loadSound('sounds/doubleSnare.mp3');
+        }
+
+        function setup() {
+            createCanvas(1470, 750);
+            recordRemix = new p5.SoundRecorder();
+            recordRemix.setInput(songs[whatsPlaying]);
+            saveRemix = new p5.SoundFile();
+
+            recordSong = createButton('Record Remix');
+            recordSong.position(490, 600);
+            recordSong.mousePressed(startRecording);
+
+            stopRecord = createButton('Stop Record & Save');
+            stopRecord.position(820, 600);
+            stopRecord.mousePressed(downloadRemix);
+
+            for (let i = 0; i < allSongs; i++) {
+                songButtons[i] = createButton(songTitles[i]).mouseClicked(() => iWasClicked(i));
+                songButtons[i].position(i * 100, -300);
+            }
+
+            spinRec = new Record();
+            fft = new p5.FFT();
+            songs[whatsPlaying].amp(0.2);
+
+            distortion = new p5.Distortion();
+            distortionSl = createSlider(0, 100, 0).position(830, 175).style('transform', 'rotate(270deg)').style('height', '300px').size(330);
+
+            delay = new p5.Delay();
+            delaySl = createSlider(0, 100, 0).position(955, 175).style('transform', 'rotate(270deg)').style('height', '300px').size(330);
+
+            speedSl = createSlider(0.1, 2, 1, 0.01).position(1080, 175).style('transform', 'rotate(270deg)').style('height', '300px').size(330);
+
+            // Setting up region buttons
+            sabut = createButton("SouthAm").position(160, 220).mousePressed(saPlaylist);
+            afbut = createButton("Africa").position(330, 220).mousePressed(afPlaylist);
+            nabut = createButton("NorthAm").position(470, 220).mousePressed(naPlaylist);
+            asbut = createButton("Asia").position(655, 220).mousePressed(asiaPlaylist);
+            eubut = createButton("Eur").position(820, 220).mousePressed(euPlaylist);
+
+            echoHornBut = createButton("Echo Horn").position(1040, 630).mousePressed(playEchoHorn);
+            discStopBut = createButton("Disc Stop").position(1190, 630).mousePressed(playDiscStop);
+            discScratchBut = createButton("Disc Scratch").position(1040, 590).mousePressed(playDiscScratch);
+            doubleSnareBut = createButton("Double Snare").position(1170, 590).mousePressed(playDoubleSnare);
+
+            pausebut = createButton("⏸️").position(695, 600).mousePressed(pauseSong);
+        }
+
+        function startRecording() {
+            recordRemix.record(songs[whatsPlaying]);
+            recording = true;
+            console.log('Now Recording..');
+        }
+
+        function downloadRemix() {
+            recordRemix.stop();
+            saveSound(songs[whatsPlaying], songTitles[whatsPlaying] + ' Remix');
+            recording = false;
+            console.log('Recording Stopped');
+        }
+
+        function playEchoHorn() {
+            echoHorn.play();
+        }
+
+        function playDiscStop() {
+            discStop.play();
+        }
+
+        function playDiscScratch() {
+            discScratch.play();
+        }
+
+        function playDoubleSnare() {
+            doubleSnare.play();
+        }
+
+        function saPlaylist() {
+            songButtons[0].position(220,300);
+            songButtons[1].position(500,300);
+            songButtons[2].position(750,300);
+            for (let i = 3; i < allSongs; i++) {
+                songButtons[i].position(-100, -100);
+            } 
+        }
+
+        function afPlaylist() {
+            songButtons[3].position(220,300);
+            songButtons[4].position(500,300);
+            songButtons[5].position(750,300);
+            for (let i = 0; i < allSongs; i++) {
+                if (i !== 3 && i !== 4 && i !== 5) {
+                    songButtons[i].position(-100, -100);
+                }
+            }
+        } 
+
+        function naPlaylist() {
+            songButtons[6].position(220,300);
+            songButtons[7].position(500,300);
+            songButtons[8].position(750,300);
+            for (let i = 0; i < allSongs; i++) {
+                if (i !== 6 && i !== 7 && i !== 8) {
+                    songButtons[i].position(-100, -100);
+                }
+            }
+        }
+
+        function asiaPlaylist() {
+            songButtons[9].position(220,300);
+            songButtons[10].position(500,300);
+            songButtons[11].position(750,300);
+            for (let i = 0; i < allSongs; i++) {
+                if (i !== 9 && i !== 10 && i !== 11) {
+                    songButtons[i].position(-100, -100);
+                }
+            }
+        } 
+
+        function euPlaylist() {
+            songButtons[12].position(220,300);
+            songButtons[13].position(500,300);
+            songButtons[14].position(750,300);
+            for (let i = 0; i < allSongs; i++) {
+                if (i !== 12 && i !== 13 && i !== 14) {
+                    songButtons[i].position(-100, -100);
+                }
+            }
+        } 
+
+        function draw() {
+            tint(100);
+            background(bigone);
+            fill(225);
+            rectMode(CENTER);
+            rect(width / 2, height / 2, 1200, 600, 20);
+            imageMode(CORNER);
+            noTint();
+
+            // Waveform of song playing
+            let waveform = fft.waveform();
+            noFill();
+            beginShape();
+            stroke(100);
+            strokeWeight(2);
+            for (let i = 0; i < waveform.length; i++) {
+                let x = map(i, 0, waveform.length, 960, 445);
+                let y = map(waveform[i], -1, 1, 200, height - 100);
+                vertex(x, y);
+            }
+            endShape();
+
+            // Update effects
+            let amtD = delaySl.value() / 100;
+            delay.drywet(amtD);
+            delay.process(songs[whatsPlaying], 0.20, .8, 2300);
+
+            let amtDis = distortionSl.value() / 100;
+            distortion.drywet(amtDis);
+            distortion.process(songs[whatsPlaying], 0.20, .8, 2300);
+
+            let speed = speedSl.value(); 
+            songs[whatsPlaying].rate(speed);
+
+            // Progress line
+            stroke(150, 150);
+            line(450, 550, 953, 550);
+            for(let i = 0 ; i< allSongs; i++){
+                songsDuration[i] = songs[i].duration();
+            }
+
+            if (songs[whatsPlaying].isPlaying()) {
+                cTime = songs[whatsPlaying].currentTime();
+                let timeLeft = songsDuration[whatsPlaying] - cTime;
+                strokeWeight(8);
+                stroke(18);
+                let pct = lerp(450, 550, cTime / songsDuration[whatsPlaying]);
+                line(450, 550, pct, 550);
+                strokeWeight(10);
+                point(pct, 550);
+                strokeWeight(1);
+                fill(0);  
+                textSize(13);
+                text(int(frontZero(songs[whatsPlaying].currentTime())), 455, 575);
+                text("-" + int((timeLeft)), 920, 575);
+            }
+
+            spinRec.update();
+            if (songs[0].isPlaying()) {
+                spinRec.renderLabel(soda);
+            } else if (songs[1].isPlaying()) {
+                spinRec.renderLabel(enanitos);
+            } else if (songs[2].isPlaying()) {
+                spinRec.renderLabel(abuelos);
+            } else if (songs[3].isPlaying()) {
+                spinRec.renderLabel(youssou);
+            } else if (songs[4].isPlaying()) {
+                spinRec.renderLabel(vivi);
+            } else if (songs[5].isPlaying()) {
+                spinRec.renderLabel(magicSys);
+            } else if (songs[6].isPlaying()) {
+                spinRec.renderLabel(tate);
+            } else if (songs[7].isPlaying()) {
+                spinRec.renderLabel(nerPic);
+            } else if (songs[8].isPlaying()) {
+                spinRec.renderLabel(vMonet);
+            } else if (songs[9].isPlaying()) {
+                spinRec.renderLabel(skyResto);
+            } else if (songs[10].isPlaying()) {
+                spinRec.renderLabel(maher);
+            } else if (songs[11].isPlaying()) {
+                spinRec.renderLabel(rapline);
+            } else if (songs[12].isPlaying()) {
+                spinRec.renderLabel(tayc);
+            } else if (songs[13].isPlaying()) {
+                spinRec.renderLabel(alicia);
+            } else if (songs[14].isPlaying()) {
+                spinRec.renderLabel(sally);
+            }
+        }
+
+        function iWasClicked(val) {
+            if(!songs[val].isPlaying()) {
+                for (let i = 0; i < songs.length; i++) {
+                    if (val != i && songs[i].isPlaying) songs[i].stop();
+                }
+                songs[val].play();
+                songs[val].setVolume(.2);
+            }
+            whatsPlaying = val;
+        }
+
+        function pauseSong() {
+            songs[whatsPlaying].pause();
+        }
+
+        class Record {
+            constructor() {
+                this.xpos = 0;
+                this.ypos = 0;
+                this.rot = 0.0;
+                this.pic;
+            }
+            update() {
+                push();
+                translate(280, 480);
+                rotate(-this.rot * 4.0);
+                this.rot += .01;
+            }
+            renderLabel(labelImage) {
+                this.pic = labelImage;
+                imageMode(CENTER);
+                image(this.pic, this.xpos, this.ypos, 300, 300);
+            }
+        }
+
+        function frontZero(num) {
+            return num <= 9 ? "0" + num : num;
+        }
+
+        function mousePressed(){
+            console.log(mouseX + "," + mouseY);
+        }
+    </script>
+</body>
+</html>
